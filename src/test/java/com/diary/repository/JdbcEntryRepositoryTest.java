@@ -25,7 +25,7 @@ class JdbcEntryRepositoryTest {
 
     private static final String H2_URL = "jdbc:h2:mem:diary_test;DB_CLOSE_DELAY=-1";
     private static final String H2_USER = "sa";
-    private static final String H2_PASSWORD = "";
+    private static final String H2_PASSWORD = ""; 
     private static final String SCHEMA_RESOURCE = "/schema.sql";
     private static final String DROP_TABLE_SQL = "DROP TABLE IF EXISTS entry";
 
