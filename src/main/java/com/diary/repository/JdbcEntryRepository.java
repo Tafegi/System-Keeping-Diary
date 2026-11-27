@@ -14,6 +14,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Реалізує {@link EntryRepository} для таблиці {@code entry} за допомогою JDBC.
+ * Для кожної операції відкриває з'єднання, виконує параметризований SQL-запит
+ * і закриває використані JDBC-ресурси.
+ *
+ * <p>Помилки JDBC передає викликачу як {@link RepositoryException},
+ * зберігаючи початковий {@link SQLException} як причину.
+ */
 public class JdbcEntryRepository implements EntryRepository {
 
     private static final String COLUMN_ID = "id";
@@ -39,10 +47,24 @@ public class JdbcEntryRepository implements EntryRepository {
 
     private final DatabaseConnection databaseConnection;
 
+    /**
+     * Створює репозиторій із заданим джерелом JDBC-з'єднань.
+     *
+     * @param databaseConnection об'єкт, який відкриває з'єднання для операцій репозиторію
+     */
     public JdbcEntryRepository(DatabaseConnection databaseConnection) {
         this.databaseConnection = databaseConnection;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Після вставлення рядка читає згенерований ключ і повертає копію
+     * переданого запису з цим ключем. Решту полів копіює з вихідного об'єкта.
+     *
+     * @throws RepositoryException якщо під час операції виникла помилка JDBC
+     *         або база даних не повернула згенерований ідентифікатор
+     */
     @Override
     public DiaryEntry add(DiaryEntry entry) {
         try (Connection connection = databaseConnection.getConnection();
@@ -56,6 +78,14 @@ public class JdbcEntryRepository implements EntryRepository {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Перевіряє ідентифікатор запису та його власника в одному SQL-запиті.
+     *
+     * @throws RepositoryException якщо під час пошуку або читання результату
+     *         виникла помилка JDBC
+     */
     @Override
     public Optional<DiaryEntry> findById(long id, long userId) {
         try (Connection connection = databaseConnection.getConnection();
@@ -73,6 +103,14 @@ public class JdbcEntryRepository implements EntryRepository {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Вибирає рядки за {@code user_id} та впорядковує їх у базі даних
+     * за {@code entry_date DESC, id DESC}.
+     *
+     * @throws RepositoryException якщо під час отримання списку виникла помилка JDBC
+     */
     @Override
     public List<DiaryEntry> findAllByUserId(long userId) {
         try (Connection connection = databaseConnection.getConnection();
@@ -90,6 +128,15 @@ public class JdbcEntryRepository implements EntryRepository {
         }
     }
 
+    /**
+     * Заповнює шість параметрів запиту INSERT у порядку стовпців таблиці.
+     * Статус передає як назву значення enum, дату запису — як SQL DATE,
+     * а час створення — як SQL TIMESTAMP.
+     *
+     * @param statement підготовлений запит на вставлення запису
+     * @param entry запис, значення полів якого передаються в запит
+     * @throws SQLException якщо JDBC-драйверу не вдалося встановити параметр
+     */
     private void bindEntryFields(PreparedStatement statement, DiaryEntry entry) throws SQLException {
         statement.setLong(1, entry.getUserId());
         statement.setString(2, entry.getTitle());
@@ -99,6 +146,14 @@ public class JdbcEntryRepository implements EntryRepository {
         statement.setTimestamp(6, Timestamp.valueOf(entry.getCreatedAt()));
     }
 
+    /**
+     * Читає ідентифікатор із першого рядка згенерованих ключів після INSERT.
+     *
+     * @param statement виконаний запит, підготовлений для повернення згенерованих ключів
+     * @return ідентифікатор нового запису
+     * @throws SQLException якщо виникла помилка JDBC під час читання ключів
+     * @throws RepositoryException якщо запит не повернув жодного ключа
+     */
     private long readGeneratedId(PreparedStatement statement) throws SQLException {
         try (ResultSet keys = statement.getGeneratedKeys()) {
             if (!keys.next()) {
@@ -108,6 +163,16 @@ public class JdbcEntryRepository implements EntryRepository {
         }
     }
 
+    /**
+     * Створює запис щоденника зі значень поточного рядка результату.
+     * Курсор має вже вказувати на рядок, який потрібно прочитати.
+     *
+     * @param row результат SQL-запиту з полями запису щоденника
+     * @return об'єкт {@link DiaryEntry}, відновлений із поточного рядка
+     * @throws SQLException якщо не вдалося прочитати значення стовпця
+     * @throws IllegalArgumentException якщо назва статусу не відповідає
+     *         жодному значенню {@link EntryStatus} або дані порушують правила побудови запису
+     */
     private DiaryEntry mapRow(ResultSet row) throws SQLException {
         return new DiaryEntry.Builder()
                 .id(row.getLong(COLUMN_ID))
@@ -120,6 +185,14 @@ public class JdbcEntryRepository implements EntryRepository {
                 .build();
     }
 
+    /**
+     * Створює копію запису з ідентифікатором, який призначила база даних.
+     * Власника, заголовок, текст, дату, статус і час створення бере з вихідного запису.
+     *
+     * @param entry вихідний запис
+     * @param id згенерований ідентифікатор
+     * @return новий об'єкт {@link DiaryEntry} із заданим ідентифікатором
+     */
     private DiaryEntry copyWithId(DiaryEntry entry, long id) {
         return new DiaryEntry.Builder()
                 .id(id)
