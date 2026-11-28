@@ -21,13 +21,21 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * Точка входу. Лише створює об'єкти й з'єднує їх між собою, без жодної логіки.
+ * Точка входу Telegram-бота для ведення щоденника.
+ * Створює репозиторій, сервіс і команди та з'єднує їх із Telegram.
  */
 public class Main {
 
     private static final String TOKEN_ENV_VARIABLE = "BOT_TOKEN";
     private static final Logger LOGGER = Logger.getLogger(Main.class.getName());
 
+    /**
+     * Реєструє бота й очікує оновлень від Telegram у режимі long polling.
+     *
+     * @param args аргументи командного рядка, які застосунок не використовує
+     * @throws Exception якщо не вдалося зареєструвати бота, очікування було
+     *                   перервано або виникла помилка під час закриття застосунку
+     */
     public static void main(String[] args) throws Exception {
         String token = readToken();
         TelegramClient client = new OkHttpTelegramClient(token);
@@ -40,6 +48,12 @@ public class Main {
         }
     }
 
+    /**
+     * Читає токен бота зі змінної середовища {@code BOT_TOKEN}.
+     *
+     * @return токен для доступу до Telegram Bot API
+     * @throws IllegalStateException якщо змінна відсутня, порожня або містить лише пропуски
+     */
     private static String readToken() {
         String token = System.getenv(TOKEN_ENV_VARIABLE);
         if (token == null || token.isBlank()) {
@@ -48,6 +62,14 @@ public class Main {
         return token;
     }
 
+    /**
+     * Створює сервіс щоденника та реєструє команди
+     * {@code /start}, {@code /new} і {@code /list}.
+     *
+     * @param gateway засіб надсилання відповідей користувачу
+     * @return маршрутизатор із зареєстрованими командами
+     * @throws IllegalStateException якщо файл конфігурації бази даних не вдалося прочитати
+     */
     private static CommandRouter createRouter(MessageGateway gateway) {
         EntryRepository repository = new JdbcEntryRepository(DatabaseConnection.fromProperties());
         EntryService service = new EntryService(repository, Clock.systemDefaultZone());
